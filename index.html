@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>P-DX 출퇴근 기록부</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f4eee0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="출퇴근 기록부">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="seal-logo" aria-hidden="true">勤</span>
+    <h1><span class="brand-en">P-DX</span> 출퇴근 기록부</h1>
+  </div>
+  <div class="std-settings">
+    <label for="stdIn">기준 근무시간</label>
+    <input id="stdIn" type="time" step="1800" aria-label="기준 출근 시각">
+    <span class="tilde">~</span>
+    <input id="stdOut" type="time" step="1800" aria-label="기준 퇴근 시각">
+    <span id="stdWarn" class="std-note" hidden></span>
+  </div>
+</header>
+
+<main>
+  <section class="today-card" aria-label="오늘">
+    <p class="today-date" id="todayDate"></p>
+    <p class="clock" id="clock" aria-hidden="true">--:--:--</p>
+
+    <div class="stamp-row">
+      <button id="btnIn" class="stamp-btn stamp-in" type="button">
+        <span class="stamp-word">출근</span>
+        <small>도장 찍기</small>
+      </button>
+      <button id="btnOut" class="stamp-btn stamp-out" type="button">
+        <span class="stamp-word">퇴근</span>
+        <small>도장 찍기</small>
+      </button>
+    </div>
+
+    <div class="today-marks">
+      <div class="mark-slot" id="markIn" data-label="출근"></div>
+      <div class="mark-slot" id="markOut" data-label="퇴근"></div>
+    </div>
+
+    <p class="today-status" id="todayStatus"></p>
+  </section>
+
+  <section class="cal-card" aria-label="월별 기록">
+    <div class="cal-head">
+      <button id="prevM" class="nav-btn" type="button" aria-label="이전 달">&#9664;</button>
+      <h2 id="calTitle" class="cal-title"></h2>
+      <button id="nextM" class="nav-btn" type="button" aria-label="다음 달">&#9654;</button>
+      <button id="goToday" class="today-btn" type="button">오늘</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-summary" id="calSummary"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span class="foot-hint">달력의 날짜를 누르면 직접 수정할 수 있습니다 · <span id="storeHint">기록은 이 기기에 저장됩니다</span></span>
+  <span class="foot-actions">
+    <button id="btnPlace" class="link-btn" type="button" hidden>근무지 설정</button>
+    <button id="btnFile" class="link-btn" type="button" hidden>파일에 저장 연결</button>
+  </span>
+</footer>
+
+<!-- 기록 수정 모달 -->
+<div class="modal-backdrop" id="editModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <h3 id="editTitle" class="modal-title"></h3>
+    <div class="edit-fields">
+      <label>출근 <input id="editIn" type="time" step="1800"></label>
+      <label>퇴근 <input id="editOut" type="time" step="1800"></label>
+    </div>
+    <p class="edit-hint" id="editHint"></p>
+    <div class="modal-btns">
+      <button id="editDelete" class="btn danger" type="button">기록 삭제</button>
+      <span class="btn-gap"></span>
+      <button id="editCancel" class="btn ghost" type="button">취소</button>
+      <button id="editSave" class="btn primary" type="button">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 확인 모달 -->
+<div class="modal-backdrop" id="confirmModal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmMsg">
+    <p id="confirmMsg" class="confirm-msg"></p>
+    <div class="modal-btns">
+      <span class="btn-gap"></span>
+      <button id="confirmCancel" class="btn ghost" type="button">취소</button>
+      <button id="confirmOk" class="btn primary" type="button">확인</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastWrap" aria-live="polite"></div>
+
+<script src="app.js" defer></script>
+</body>
+</html>

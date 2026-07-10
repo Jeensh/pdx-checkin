@@ -1,0 +1,26 @@
+{
+  "name": "P-DX 출퇴근 기록부",
+  "short_name": "출퇴근",
+  "description": "출퇴근 도장과 월별 기록, 기준 근무시간 대비 ± 확인",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4eee0",
+  "theme_color": "#f4eee0",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
