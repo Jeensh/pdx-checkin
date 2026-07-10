@@ -1,7 +1,8 @@
-// 출퇴근 기록부 서비스 워커 — 오프라인 지원
-// 전략: 네트워크 우선(항상 최신 코드), 실패 시 캐시(오프라인)
+// 출퇴근 기록부 서비스 워커
+// 전략: 캐시 즉시 표시(빠른 실행) + 백그라운드 갱신(stale-while-revalidate)
+// → 앱이 네트워크를 기다리지 않고 바로 뜨고, 새 버전은 다음 실행에 반영된다.
 
-const CACHE = 'checkin-v4';
+const CACHE = 'checkin-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -32,17 +33,18 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(e.request)
-      .then(r => {
-        if (r.ok && new URL(e.request.url).origin === location.origin) {
-          const copy = r.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy));
-        }
-        return r;
-      })
-      .catch(() =>
-        caches.match(e.request, { ignoreSearch: true })
-          .then(m => m || caches.match('./index.html'))
-      )
+    caches.match(e.request, { ignoreSearch: true }).then(cached => {
+      const fetched = fetch(e.request)
+        .then(r => {
+          if (r.ok && new URL(e.request.url).origin === location.origin) {
+            const copy = r.clone();
+            caches.open(CACHE).then(c => c.put(e.request, copy));
+          }
+          return r;
+        })
+        .catch(() => cached || caches.match('./index.html'));
+      // 캐시가 있으면 즉시 반환하고 네트워크 갱신은 백그라운드에서
+      return cached || fetched;
+    })
   );
 });

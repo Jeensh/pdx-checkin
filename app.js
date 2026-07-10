@@ -148,7 +148,7 @@ async function idbDel(store, key) {
 }
 
 /* ===================== 저장 · 불러오기 =====================
-   localStorage(기본) + IndexedDB 미러(이중화) + 파일(PC, 선택) */
+   localStorage(기본) + IndexedDB 미러(이중화) — 앱 자체 저장 */
 
 function persist() {
   data.meta = { savedAt: new Date().toISOString() };
@@ -159,7 +159,6 @@ function persist() {
     toast('저장 실패 — 브라우저 저장공간을 확인하세요', true);
   }
   idbSet('kv', 'data', json).catch(() => { /* 미러 실패는 무시 */ });
-  if (fileOn && fileHandle) writeFileQueued();
 }
 
 async function loadData() {
@@ -176,144 +175,6 @@ async function loadData() {
     } catch (e) { /* 무시 */ }
   }
   data = normalize(raw);
-}
-
-/* ===================== 파일 저장 연결 (File System Access API) =====================
-   Chrome/Edge/Whale 등 크로미움 계열(PC). 미지원 브라우저는 버튼이 숨겨진다. */
-
-const FILE_API = typeof window.showSaveFilePicker === 'function';
-let fileHandle = null;
-let fileOn = false;
-
-let writeQueue = Promise.resolve();
-function writeFileQueued() {
-  writeQueue = writeQueue.then(writeFileNow).catch(() => {
-    fileOn = false;
-    updateFileUI();
-    toast('파일 저장 실패 — 파일 연결이 해제되었습니다', true);
-  });
-  return writeQueue;
-}
-async function writeFileNow() {
-  if (!fileHandle) return;
-  const w = await fileHandle.createWritable();
-  await w.write(JSON.stringify(data, null, 2));
-  await w.close();
-}
-
-// 연결된 파일을 읽어 브라우저 기록과 비교 — 최신 쪽을 채택하고 양쪽을 동기화한다
-async function adoptFile() {
-  try {
-    const f = await fileHandle.getFile();
-    let fileData = null;
-    try { fileData = JSON.parse(await f.text()); } catch (e) { /* 빈/손상 파일 */ }
-    if (fileData && typeof fileData === 'object' && typeof fileData.records === 'object') {
-      const next = normalize(fileData);
-      const fileSaved = (fileData.meta && fileData.meta.savedAt) || '';
-      const localSaved = (data.meta && data.meta.savedAt) || '';
-      const fileNewer = fileSaved > localSaved; // ISO 문자열이라 사전순 = 시간순
-      const localEmpty = Object.keys(data.records).length === 0;
-      if (fileNewer || (localEmpty && Object.keys(next.records).length > 0)) {
-        data = next;
-        render();
-      }
-    }
-    fileOn = true;
-    persist();
-    updateFileUI();
-    toast(`파일 연결됨: ${fileHandle.name}`);
-  } catch (e) {
-    fileOn = false;
-    updateFileUI();
-    toast('파일을 읽지 못했습니다', true);
-  }
-}
-
-async function connectFile() {
-  if (fileOn) {
-    confirmBox(
-      `파일(${fileHandle.name}) 연결을 해제할까요?\n이후 기록은 이 브라우저에만 저장됩니다.`,
-      async () => {
-        fileOn = false;
-        fileHandle = null;
-        try { await idbDel('handles', 'main'); } catch (e) { /* 무시 */ }
-        updateFileUI();
-        toast('파일 연결이 해제되었습니다');
-      },
-      '해제'
-    );
-    return;
-  }
-  try {
-    if (fileHandle && typeof fileHandle.requestPermission === 'function') {
-      const p = await fileHandle.requestPermission({ mode: 'readwrite' });
-      if (p !== 'granted') { toast('파일 사용 권한이 거부되었습니다', true); return; }
-      await adoptFile();
-      return;
-    }
-    const h = await window.showSaveFilePicker({
-      suggestedName: '출퇴근기록.json',
-      types: [{ description: 'JSON 파일', accept: { 'application/json': ['.json'] } }],
-    });
-    fileHandle = h;
-    try { await idbSet('handles', 'main', h); } catch (e) { /* 무시 */ }
-    await adoptFile();
-  } catch (e) {
-    if (e && e.name === 'AbortError') return;
-    toast('파일 연결에 실패했습니다', true);
-  }
-}
-
-async function initFile() {
-  if (!FILE_API) return;
-  $('btnFile').hidden = false;
-  try { fileHandle = (await idbGet('handles', 'main')) || null; } catch (e) { fileHandle = null; }
-  if (fileHandle && typeof fileHandle.queryPermission === 'function') {
-    try {
-      if ((await fileHandle.queryPermission({ mode: 'readwrite' })) === 'granted') {
-        await adoptFile();
-        return;
-      }
-    } catch (e) { /* 무시 */ }
-    armAutoReconnect();
-  }
-  updateFileUI();
-}
-
-// 권한 요청은 사용자 제스처 안에서만 가능하므로 첫 상호작용에 얹는다
-function armAutoReconnect() {
-  const handler = e => {
-    if (e.target && e.target.closest && e.target.closest('#btnFile')) return;
-    document.removeEventListener('pointerdown', handler, true);
-    document.removeEventListener('keydown', handler, true);
-    if (!fileHandle || fileOn || typeof fileHandle.requestPermission !== 'function') return;
-    toast("파일 다시 연결 중 — 권한 창에서 '매번 방문 시 허용'을 누르면 다음부터 자동입니다");
-    fileHandle.requestPermission({ mode: 'readwrite' }).then(p => {
-      if (p === 'granted') return adoptFile();
-      toast("파일 연결 보류 — 하단 '파일 다시 연결'로 언제든 연결할 수 있어요", true);
-      return null;
-    }).catch(() => { /* 무시 */ });
-  };
-  document.addEventListener('pointerdown', handler, true);
-  document.addEventListener('keydown', handler, true);
-}
-
-function updateFileUI() {
-  const btn = $('btnFile');
-  const hint = $('storeHint');
-  if (fileOn) {
-    btn.textContent = `파일 연결됨: ${fileHandle.name}`;
-    btn.classList.add('on');
-    hint.textContent = '기록은 파일과 브라우저 양쪽에 저장됩니다';
-  } else if (fileHandle) {
-    btn.textContent = '파일 다시 연결';
-    btn.classList.remove('on');
-    hint.textContent = '기록은 이 기기에 저장됩니다';
-  } else {
-    btn.textContent = '파일에 저장 연결';
-    btn.classList.remove('on');
-    hint.textContent = '기록은 이 기기에 저장됩니다';
-  }
 }
 
 /* ===================== 위치 기반 자동 출퇴근 =====================
@@ -830,8 +691,6 @@ function bindEvents() {
     });
   }
 
-  $('btnFile').addEventListener('click', connectFile);
-
   $('editSave').addEventListener('click', saveEdit);
   $('editDelete').addEventListener('click', deleteEdit);
   $('editCancel').addEventListener('click', () => closeModal($('editModal')));
@@ -907,7 +766,6 @@ async function init() {
   render();
   tick();
   setInterval(tick, 1000);
-  initFile();        // 파일 연결 (PC)
   setupPlaceButton(); // 근무지 설정 (모바일)
 
   // 브라우저에 저장공간 영구 보존 요청 (모바일 임의 삭제 방지)

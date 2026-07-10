@@ -128,7 +128,9 @@ input:focus-visible {
   gap: 8px;
   font-size: 13px;
   color: var(--ink-soft);
+  flex-wrap: nowrap;
 }
+.std-settings label { white-space: nowrap; }
 .std-settings .tilde { color: var(--ink-soft); }
 .std-settings input[type="time"] {
   font-family: var(--mono);
@@ -657,10 +659,17 @@ main {
 
 @media (max-width: 560px) {
   .topbar, main, .foot { padding-left: 14px; padding-right: 14px; }
+  /* 종이 결 오버레이는 모바일에서 끔 — 스크롤 성능 */
+  body::before { display: none; }
   .clock { font-size: 38px; }
   .stamp-btn { width: 100px; height: 100px; }
   .stamp-btn .stamp-word { font-size: 22px; }
-  .cal-cell { min-height: 66px; padding: 4px 4px; }
+  /* 기준 근무시간 한 줄 유지 */
+  .std-settings { gap: 5px; font-size: 12px; }
+  .std-settings input[type="time"] { font-size: 12.5px; padding: 3px 5px; }
+  .cal-cell { min-height: 66px; padding: 6px 4px 4px 6px; }
+  /* 오늘 동그라미가 칸 안에 온전히 들어오도록 작게 */
+  .cal-cell.today .dnum::after { inset: -2px -4px; border-width: 1.5px; }
   /* 좁은 화면: 출/퇴 접두어를 숨기고 색으로 구분 — 시간이 줄바꿈되지 않게 */
   .times em i { display: none; }
   .times em { font-size: 10.5px; letter-spacing: -0.02em; }
@@ -668,7 +677,8 @@ main {
   .t-out { color: var(--sat); opacity: 1; }
   .diff { font-size: 9.5px; right: 3px; bottom: 3px; padding: 1px 4px; }
   .cal-card { padding: 14px 10px; }
-  .foot { flex-direction: column; gap: 4px; }
+  .foot { flex-direction: column; gap: 6px; align-items: flex-start; }
+  .foot-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
