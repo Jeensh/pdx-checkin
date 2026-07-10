@@ -452,6 +452,7 @@ main {
   flex-direction: column;
   gap: 1px;
   margin-top: 5px;
+  margin-bottom: 3px; /* ± 배지와 최소 간격 */
   min-width: 0;
   max-width: 100%;
 }
@@ -468,9 +469,9 @@ main {
 .times em i { font-style: normal; color: var(--ink-soft); }
 
 .diff {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
+  /* 흐름 배치 + 아래로 밀어내기 — 시간 텍스트와 절대 겹치지 않는다 */
+  margin-top: auto;
+  align-self: flex-end;
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 700;
@@ -675,7 +676,7 @@ main {
   .times em { font-size: 10.5px; letter-spacing: -0.02em; }
   .t-in { color: var(--ink); }
   .t-out { color: var(--sat); opacity: 1; }
-  .diff { font-size: 9.5px; right: 3px; bottom: 3px; padding: 1px 4px; }
+  .diff { font-size: 9.5px; padding: 1px 4px; }
   .cal-card { padding: 14px 10px; }
   .foot { flex-direction: column; gap: 6px; align-items: flex-start; }
   .foot-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
