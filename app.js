@@ -43,7 +43,7 @@ const $ = id => document.getElementById(id);
 
 /* ===================== 상태 ===================== */
 
-let data = null;            // { settings:{workStart,workEnd,workplace}, records:{...}, meta:{savedAt} }
+let data = null;            // { settings:{workStart,workEnd}, records:{...}, meta:{savedAt} }
 let viewY = 0, viewM = 0;   // 달력에 표시 중인 연/월(0-based)
 let editKey = null;         // 수정 모달이 열려 있는 날짜 키
 let curTodayKey = '';       // 자정 감지용
@@ -62,18 +62,10 @@ function normalize(raw) {
     if (toMin(v.out) !== null) rec.out = v.out;
     if (rec.in || rec.out) records[k] = rec;
   }
-  // 근무지 (위치 기반 자동 도장용)
-  let workplace = null;
-  const wp = s.workplace;
-  if (wp && typeof wp === 'object' &&
-      Number.isFinite(wp.lat) && Number.isFinite(wp.lng)) {
-    workplace = { lat: wp.lat, lng: wp.lng, radius: 50 }; // 반경 50m 고정
-  }
   return {
     settings: {
       workStart: toMin(s.workStart) !== null ? s.workStart : '09:00',
       workEnd: toMin(s.workEnd) !== null ? s.workEnd : '18:00',
-      workplace,
     },
     records,
     // savedAt: 파일↔브라우저 중 어느 쪽이 최신인지 비교하는 기준
@@ -175,110 +167,6 @@ async function loadData() {
     } catch (e) { /* 무시 */ }
   }
   data = normalize(raw);
-}
-
-/* ===================== 위치 기반 자동 출퇴근 =====================
-   근무지를 설정해 두면 앱이 열릴 때 위치를 확인해서
-   - 근무지 안 + 오늘 출근 미기록 → 자동 출근 도장
-   - 근무지 밖 + 출근 기록 있음 + 퇴근 미기록 → 자동 퇴근 도장
-   (웹앱은 백그라운드 위치를 볼 수 없어 "앱이 열리는 순간" 판정합니다.
-    iOS 단축어/안드 자동화로 도착·출발 시 이 앱을 열게 하면 자동화가 완성됩니다) */
-
-const GEO_OK = 'geolocation' in navigator &&
-  (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname));
-
-function distMeters(a, b) {
-  const R = 6371000, rad = x => x * Math.PI / 180;
-  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
-  const s = Math.sin(dLat / 2) ** 2 +
-    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(s));
-}
-
-function getPosition() {
-  return new Promise((res, rej) => {
-    navigator.geolocation.getCurrentPosition(
-      p => res({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }),
-      rej,
-      // 좁은 반경 판정을 위해 고정밀(GPS) 모드 사용
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-    );
-  });
-}
-
-let geoChecking = false;
-
-async function autoGeoCheck() {
-  if (!GEO_OK || geoChecking) return;
-  const wp = data.settings.workplace;
-  if (!wp) return;
-  geoChecking = true;
-  try {
-    const pos = await getPosition();
-    const d = distMeters(pos, wp);
-    const k = keyOf(new Date());
-    const rec = data.records[k] || {};
-
-    if (d <= wp.radius && pos.acc <= wp.radius * 1.5 && !rec.in) {
-      // 근무지 안 + 측정 오차가 신뢰할 수준 + 출근 미기록 → 자동 출근
-      applyAutoStamp(k, 'in');
-    } else if (rec.in && !rec.out && d - pos.acc > wp.radius * 1.5) {
-      // 확실히 근무지 밖(GPS 오차를 빼고도 반경의 1.5배 이상) + 퇴근 미기록 → 자동 퇴근
-      applyAutoStamp(k, 'out');
-    }
-  } catch (e) {
-    /* 위치 실패(권한 거부/시간초과)는 조용히 넘어감 */
-  } finally {
-    geoChecking = false;
-  }
-}
-
-function applyAutoStamp(k, type) {
-  const rec = Object.assign({}, data.records[k]);
-  rec[type] = stampHM();
-  data.records[k] = rec;
-  persist();
-  render();
-  slam(type);
-  toast(`📍 위치 기반 자동 ${type === 'in' ? '출근' : '퇴근'} ${rec[type]} 기록됨`);
-}
-
-function setupPlaceButton() {
-  const btn = $('btnPlace');
-  if (!GEO_OK) return; // 미지원 환경(PC file:// 등)에서는 숨김 유지
-  btn.hidden = false;
-  updatePlaceUI();
-
-  btn.addEventListener('click', () => {
-    if (data.settings.workplace) {
-      confirmBox('근무지 설정을 해제할까요?\n위치 기반 자동 출퇴근이 꺼집니다.', () => {
-        data.settings.workplace = null;
-        persist();
-        updatePlaceUI();
-        toast('근무지 설정이 해제되었습니다');
-      }, '해제');
-      return;
-    }
-    toast('현재 위치를 확인하는 중…');
-    getPosition().then(pos => {
-      data.settings.workplace = { lat: pos.lat, lng: pos.lng, radius: 50 };
-      persist();
-      updatePlaceUI();
-      toast('현재 위치가 근무지로 설정되었습니다 (반경 50m)');
-      return null;
-    }).catch(() => toast('위치를 가져오지 못했습니다 — 위치 권한을 확인하세요', true));
-  });
-}
-
-function updatePlaceUI() {
-  const btn = $('btnPlace');
-  if (data.settings.workplace) {
-    btn.textContent = '근무지 설정됨 ✓ (50m)';
-    btn.classList.add('on');
-  } else {
-    btn.textContent = '근무지 설정';
-    btn.classList.remove('on');
-  }
 }
 
 /* ===================== 렌더링 ===================== */
@@ -732,11 +620,6 @@ function bindEvents() {
   window.addEventListener('storage', e => {
     if (e.key === LS_KEY) { loadData().then(render); }
   });
-
-  // 앱이 다시 화면에 나타나면 위치 자동 판정
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') autoGeoCheck();
-  });
 }
 
 function moveMonth(delta) {
@@ -766,7 +649,6 @@ async function init() {
   render();
   tick();
   setInterval(tick, 1000);
-  setupPlaceButton(); // 근무지 설정 (모바일)
 
   // 브라우저에 저장공간 영구 보존 요청 (모바일 임의 삭제 방지)
   try {
@@ -778,12 +660,6 @@ async function init() {
       (location.protocol === 'https:' ||
        ['localhost', '127.0.0.1'].includes(location.hostname))) {
     navigator.serviceWorker.register('./sw.js').catch(() => { /* 무시 */ });
-  }
-
-  // 위치 자동 판정 — 단축어/자동화가 ?auto=1 로 열어도 같은 경로
-  autoGeoCheck();
-  if (new URLSearchParams(location.search).has('auto')) {
-    history.replaceState(null, '', location.pathname);
   }
 }
 
