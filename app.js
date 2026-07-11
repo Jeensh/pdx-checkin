@@ -151,6 +151,7 @@ function persist() {
     toast('저장 실패 — 브라우저 저장공간을 확인하세요', true);
   }
   idbSet('kv', 'data', json).catch(() => { /* 미러 실패는 무시 */ });
+  if (typeof updateBadge === 'function') updateBadge(); // 도장/수정 즉시 반영
 }
 
 async function loadData() {
@@ -167,6 +168,65 @@ async function loadData() {
     } catch (e) { /* 무시 */ }
   }
   data = normalize(raw);
+}
+
+/* ===================== 앱 아이콘 배지 =====================
+   평일(주말·공휴일 제외)에
+   - 기준 출근시간 +10분이 지났는데 출근 도장이 없으면 배지 1
+   - 출근은 있는데 기준 퇴근시간 +10분이 지나도 퇴근 도장이 없으면 배지 2
+   출근(1)이 항상 우선. 앱이 실행되거나 백그라운드로 갈 때마다 갱신된다.
+   (iOS 16.4+ 홈 화면 앱 지원 · 미지원 브라우저에서는 조용히 무시) */
+
+const HOLIDAYS = {
+  // 2026
+  '2026-01-01': 1, '2026-02-16': 1, '2026-02-17': 1, '2026-02-18': 1,
+  '2026-03-01': 1, '2026-03-02': 1, '2026-05-05': 1, '2026-05-24': 1,
+  '2026-05-25': 1, '2026-06-03': 1, '2026-06-06': 1, '2026-08-15': 1,
+  '2026-08-17': 1, '2026-09-24': 1, '2026-09-25': 1, '2026-09-26': 1,
+  '2026-10-03': 1, '2026-10-05': 1, '2026-10-09': 1, '2026-12-25': 1,
+  // 2027
+  '2027-01-01': 1, '2027-02-05': 1, '2027-02-06': 1, '2027-02-07': 1,
+  '2027-02-08': 1, '2027-03-01': 1, '2027-05-05': 1, '2027-05-13': 1,
+  '2027-06-06': 1, '2027-08-15': 1, '2027-08-16': 1, '2027-09-14': 1,
+  '2027-09-15': 1, '2027-09-16': 1, '2027-10-03': 1, '2027-10-04': 1,
+  '2027-10-09': 1, '2027-10-11': 1, '2027-12-25': 1, '2027-12-27': 1,
+};
+
+const isWeekendDay = d => d.getDay() === 0 || d.getDay() === 6;
+const isWorkday = d => !isWeekendDay(d) && !HOLIDAYS[keyOf(d)];
+
+// 0 = 배지 없음, 1 = 출근 누락, 2 = 퇴근 누락
+function badgeState(now = new Date()) {
+  if (!isWorkday(now)) return 0;
+  const rec = data.records[keyOf(now)] || {};
+  const cur = now.getHours() * 60 + now.getMinutes();
+  const a = toMin(data.settings.workStart);
+  const b = toMin(data.settings.workEnd);
+  if (a !== null && cur >= a + 10 && !rec.in) return 1;          // 출근 우선
+  if (b !== null && a !== null && b > a &&                        // 야간 기준은 제외
+      cur >= b + 10 && rec.in && !rec.out) return 2;
+  return 0;
+}
+
+let lastBadge = -1;
+function updateBadge() {
+  if (!('setAppBadge' in navigator)) return;
+  const n = badgeState();
+  if (n === lastBadge) return;
+  lastBadge = n;
+  const p = n ? navigator.setAppBadge(n) : navigator.clearAppBadge();
+  if (p && p.catch) p.catch(() => { /* 권한 없음 등은 무시 */ });
+}
+
+// iOS는 배지에 알림 권한이 필요 — 첫 터치에 한 번만 요청
+function armBadgePermission() {
+  if (!('setAppBadge' in navigator)) return;
+  if (typeof Notification === 'undefined' || Notification.permission !== 'default') return;
+  const handler = () => {
+    document.removeEventListener('pointerdown', handler, true);
+    Notification.requestPermission().then(() => updateBadge()).catch(() => { /* 무시 */ });
+  };
+  document.addEventListener('pointerdown', handler, true);
 }
 
 /* ===================== 렌더링 ===================== */
@@ -620,6 +680,9 @@ function bindEvents() {
   window.addEventListener('storage', e => {
     if (e.key === LS_KEY) { loadData().then(render); }
   });
+
+  // 백그라운드로 가기 직전/돌아올 때 배지 갱신
+  document.addEventListener('visibilitychange', updateBadge);
 }
 
 function moveMonth(delta) {
@@ -636,9 +699,11 @@ function tick() {
     `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   if (keyOf(now) !== curTodayKey) { // 자정을 넘겼음
     render();
+    updateBadge();
     return;
   }
   updateTodayStatus();
+  updateBadge(); // 값이 바뀔 때만 실제 API 호출됨
 }
 
 async function init() {
@@ -654,6 +719,9 @@ async function init() {
   try {
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
   } catch (e) { /* 무시 */ }
+
+  armBadgePermission(); // iOS 배지용 알림 권한 (첫 터치에 1회)
+  updateBadge();
 
   // PWA 오프라인 지원 — https(호스팅)에서만, PC file:// 사용에는 영향 없음
   if ('serviceWorker' in navigator &&
