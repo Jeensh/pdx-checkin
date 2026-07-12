@@ -92,8 +92,14 @@ function stdMinutes() {
   return b > a ? b - a : b + 1440 - a;
 }
 
+// 휴식 규칙: 경과시간 4시간 30분(270분)마다 30분 휴식이 반드시 포함된다.
+// 4:00→0, 4:30→30분, 9:00→1시간
+const breakFor = min => Math.floor(min / 270) * 30;
+
 // 하루 기록의 상태. kind: empty | partial | invalid(출근=퇴근) | done
 // done이면서 퇴근<출근이면 overnight(익일 퇴근)로 계산한다.
+// worked = 실근무(휴식 제외), brk = 포함된 휴식.
+// ± = 실근무 − 기준 실근무 (기준시간에도 같은 휴식 규칙 적용)
 function dayStatus(rec) {
   const i = toMin(rec && rec.in);
   const o = toMin(rec && rec.out);
@@ -101,9 +107,15 @@ function dayStatus(rec) {
   if (i === null || o === null) return { kind: 'partial', in: i, out: o };
   if (o === i) return { kind: 'invalid' };
   const overnight = o < i;
-  const worked = overnight ? o + 1440 - i : o - i;
+  const raw = overnight ? o + 1440 - i : o - i;
+  const brk = breakFor(raw);
+  const worked = raw - brk;
   const std = stdMinutes();
-  return { kind: 'done', worked, overnight, diff: std === null ? null : worked - std };
+  const netStd = std === null ? null : std - breakFor(std);
+  return {
+    kind: 'done', worked, brk, overnight,
+    diff: netStd === null ? null : worked - netStd,
+  };
 }
 
 /* ===================== IndexedDB (파일 핸들 + 데이터 미러) ===================== */
@@ -262,8 +274,9 @@ function updateTodayStatus() {
     cls = 'warn';
   } else {
     const night = st.overnight ? ' (익일 퇴근)' : '';
+    const brk = st.brk > 0 ? ` (휴식 ${fmtHM(st.brk)} 제외)` : '';
     const diff = st.diff === null ? '' : ` · 기준 대비 ${fmtSigned(st.diff)}`;
-    text = `오늘 근무 ${fmtHM(st.worked)}${night}${diff}`;
+    text = `오늘 근무 ${fmtHM(st.worked)}${brk}${night}${diff}`;
     cls = st.diff !== null && st.diff < 0 ? 'minus' : 'plus';
   }
   if (el.textContent !== text) el.textContent = text;
