@@ -92,13 +92,23 @@ function stdMinutes() {
   return b > a ? b - a : b + 1440 - a;
 }
 
-// 휴식 규칙: 경과시간 4시간 30분(270분)마다 30분 휴식이 반드시 포함된다.
-// 4:00→0, 4:30→30분, 9:00→1시간
-const breakFor = min => Math.floor(min / 270) * 30;
+// 휴식 규칙:
+//  1) 12:00~13:00은 고정 점심 휴게 — 근무 구간과 겹치는 만큼 차감
+//  2) 최소 보장: 경과 4시간 30분(270분)마다 30분 휴식 (점심을 안 끼는 근무 대비)
+//  → 휴식 = max(점심 겹침, ⌊경과/270⌋×30)
+const LUNCH_S = 720, LUNCH_E = 780; // 12:00 ~ 13:00
+function breakBetween(start, end) { // end는 익일이면 +1440 된 값
+  let lunch = 0;
+  for (const base of [0, 1440]) { // 익일 점심까지 고려
+    lunch += Math.max(0,
+      Math.min(end, LUNCH_E + base) - Math.max(start, LUNCH_S + base));
+  }
+  return Math.max(lunch, Math.floor((end - start) / 270) * 30);
+}
 
 // 하루 기록의 상태. kind: empty | partial | invalid(출근=퇴근) | done
 // done이면서 퇴근<출근이면 overnight(익일 퇴근)로 계산한다.
-// worked = 실근무(휴식 제외), brk = 포함된 휴식.
+// worked = 실근무(휴식 제외), brk = 차감된 휴식.
 // ± = 실근무 − 기준 실근무 (기준시간에도 같은 휴식 규칙 적용)
 function dayStatus(rec) {
   const i = toMin(rec && rec.in);
@@ -107,11 +117,18 @@ function dayStatus(rec) {
   if (i === null || o === null) return { kind: 'partial', in: i, out: o };
   if (o === i) return { kind: 'invalid' };
   const overnight = o < i;
-  const raw = overnight ? o + 1440 - i : o - i;
-  const brk = breakFor(raw);
+  const end = overnight ? o + 1440 : o;
+  const raw = end - i;
+  const brk = breakBetween(i, end);
   const worked = raw - brk;
-  const std = stdMinutes();
-  const netStd = std === null ? null : std - breakFor(std);
+
+  const a = toMin(data.settings.workStart);
+  const b = toMin(data.settings.workEnd);
+  let netStd = null;
+  if (a !== null && b !== null && a !== b) {
+    const bAdj = b > a ? b : b + 1440;
+    netStd = (bAdj - a) - breakBetween(a, bAdj);
+  }
   return {
     kind: 'done', worked, brk, overnight,
     diff: netStd === null ? null : worked - netStd,
