@@ -20,12 +20,22 @@ function toMin(hm) {
   return h * 60 + m;
 }
 
-// 분(0~1439)을 30분 단위로 내림한다: 14:45→14:30, 13:15→13:00
-const snapMin30 = totalMin => Math.floor(totalMin / 30) * 30;
+// 30분 단위 반올림 — 출근은 올림(7:25→7:30, 7:45→8:00),
+// 퇴근은 내림(18:20→18:00, 18:45→18:30)
+const floor30 = m => Math.floor(m / 30) * 30;
+const ceil30 = m => (Math.ceil(m / 30) * 30) % 1440;
 const minToHM = min => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
-const snapHM = hm => { const m = toMin(hm); return m === null ? null : minToHM(snapMin30(m)); };
-// 도장용: 현재 시각을 30분 단위로 내림
-const stampHM = () => { const d = new Date(); return minToHM(snapMin30(d.getHours() * 60 + d.getMinutes())); };
+// type이 'in'이면 올림, 그 외(퇴근·기준시간)는 내림
+const snapHM = (hm, type) => {
+  const m = toMin(hm);
+  return m === null ? null : minToHM(type === 'in' ? ceil30(m) : floor30(m));
+};
+// 도장용: 현재 시각을 규칙에 맞춰 스냅
+const stampHM = type => {
+  const d = new Date();
+  const m = d.getHours() * 60 + d.getMinutes();
+  return minToHM(type === 'in' ? ceil30(m) : floor30(m));
+};
 
 const fmtHM = min => `${Math.floor(min / 60)}:${pad(min % 60)}`;
 const fmtSigned = min => min === 0 ? '±0:00' : (min < 0 ? '−' : '+') + fmtHM(Math.abs(min));
@@ -361,7 +371,7 @@ function stamp(type) {
   const doIt = () => {
     const k = keyOf(new Date());
     const rec = Object.assign({}, data.records[k]);
-    rec[type] = stampHM();
+    rec[type] = stampHM(type);
     data.records[k] = rec;
     persist();
     render();
@@ -377,10 +387,10 @@ function stamp(type) {
     if (yrec && yrec.in && !yrec.out && !(trec && trec.in)) {
       const [, m, d] = yk.split('-').map(Number);
       confirmBox(
-        `어제(${m}월 ${d}일) 출근 ${yrec.in} 기록의 퇴근이 비어 있습니다.\n지금 시각을 어제의 퇴근(익일 ${stampHM()})으로 기록할까요?`,
+        `어제(${m}월 ${d}일) 출근 ${yrec.in} 기록의 퇴근이 비어 있습니다.\n지금 시각을 어제의 퇴근(익일 ${stampHM('out')})으로 기록할까요?`,
         () => {
           const fresh = Object.assign({}, data.records[yk]);
-          fresh.out = stampHM();
+          fresh.out = stampHM('out');
           data.records[yk] = fresh;
           persist();
           render();
@@ -396,7 +406,7 @@ function stamp(type) {
   const existing = (data.records[keyOf(new Date())] || {})[type];
   if (existing) {
     confirmBox(
-      `오늘 ${label} 기록(${existing})이 이미 있습니다.\n지금 시각(${stampHM()})으로 덮어쓸까요?`,
+      `오늘 ${label} 기록(${existing})이 이미 있습니다.\n지금 시각(${stampHM(type)})으로 덮어쓸까요?`,
       doIt,
       '덮어쓰기'
     );
@@ -435,9 +445,9 @@ function refocusCell(k) {
 }
 
 function saveEdit() {
-  // 입력값도 30분 단위로 내림 정렬
-  const inV = snapHM($('editIn').value);
-  const outV = snapHM($('editOut').value);
+  // 입력값도 도장과 같은 규칙: 출근은 올림, 퇴근은 내림
+  const inV = snapHM($('editIn').value, 'in');
+  const outV = snapHM($('editOut').value, 'out');
   const snapped =
     (inV !== null && inV !== $('editIn').value) ||
     (outV !== null && outV !== $('editOut').value);
