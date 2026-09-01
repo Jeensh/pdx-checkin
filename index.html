@@ -49,6 +49,17 @@
       <div class="mark-slot" id="markOut" data-label="퇴근"></div>
     </div>
 
+    <div class="quick-row">
+      <button id="btnStd" class="quick-btn" type="button" title="설정한 기준 출퇴근 시각으로 오늘 기록 채우기">🕘 정시 적용</button>
+      <div class="leave-group" role="group" aria-label="연차 적용">
+        <span class="leave-label">연차</span>
+        <button class="leave-btn" type="button" data-leave="0">없음</button>
+        <button class="leave-btn" type="button" data-leave="120">2h</button>
+        <button class="leave-btn" type="button" data-leave="240">4h</button>
+        <button class="leave-btn" type="button" data-leave="480">8h</button>
+      </div>
+    </div>
+
     <p class="today-status" id="todayStatus"></p>
   </section>
 
@@ -75,6 +86,14 @@
     <div class="edit-fields">
       <label>출근 <input id="editIn" type="time" step="1800"></label>
       <label>퇴근 <input id="editOut" type="time" step="1800"></label>
+    </div>
+    <button id="editStd" class="btn ghost small" type="button">🕘 정시 적용 (기준 시각 채우기)</button>
+    <div class="leave-group edit-leave" role="group" aria-label="연차 적용">
+      <span class="leave-label">연차</span>
+      <button class="leave-btn" type="button" data-leave="0">없음</button>
+      <button class="leave-btn" type="button" data-leave="120">2시간</button>
+      <button class="leave-btn" type="button" data-leave="240">4시간</button>
+      <button class="leave-btn" type="button" data-leave="480">8시간</button>
     </div>
     <p class="edit-hint" id="editHint"></p>
     <div class="modal-btns">

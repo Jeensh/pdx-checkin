@@ -70,7 +70,8 @@ function normalize(raw) {
     const rec = {};
     if (toMin(v.in) !== null) rec.in = v.in;
     if (toMin(v.out) !== null) rec.out = v.out;
-    if (rec.in || rec.out) records[k] = rec;
+    if ([120, 240, 480].includes(v.leave)) rec.leave = v.leave; // 연차(분): 2/4/8시간
+    if (rec.in || rec.out || rec.leave) records[k] = rec;
   }
   return {
     settings: {
@@ -113,15 +114,9 @@ function breakBetween(start, end) { // end는 익일이면 +1440 된 값
 function dayStatus(rec) {
   const i = toMin(rec && rec.in);
   const o = toMin(rec && rec.out);
-  if (i === null && o === null) return { kind: 'empty' };
-  if (i === null || o === null) return { kind: 'partial', in: i, out: o };
-  if (o === i) return { kind: 'invalid' };
-  const overnight = o < i;
-  const end = overnight ? o + 1440 : o;
-  const raw = end - i;
-  const brk = breakBetween(i, end);
-  const worked = raw - brk;
+  const leave = (rec && [120, 240, 480].includes(rec.leave)) ? rec.leave : 0;
 
+  // 기준 실근무(휴식 제외)
   const a = toMin(data.settings.workStart);
   const b = toMin(data.settings.workEnd);
   let netStd = null;
@@ -129,8 +124,23 @@ function dayStatus(rec) {
     const bAdj = b > a ? b : b + 1440;
     netStd = (bAdj - a) - breakBetween(a, bAdj);
   }
+
+  if (i === null && o === null) {
+    // 도장 없음: 연차만 있으면 연차일(연차 시간이 근무로 인정), 아니면 빈 날
+    if (leave) return { kind: 'done', worked: leave, brk: 0, overnight: false, leave,
+                        diff: netStd === null ? null : leave - netStd };
+    return { kind: 'empty' };
+  }
+  if (i === null || o === null) return { kind: 'partial', in: i, out: o, leave };
+  if (o === i) return { kind: 'invalid' };
+  const overnight = o < i;
+  const end = overnight ? o + 1440 : o;
+  const raw = end - i;
+  const brk = breakBetween(i, end);
+  const worked = raw - brk + leave; // 실근무 + 연차 인정시간
+
   return {
-    kind: 'done', worked, brk, overnight,
+    kind: 'done', worked, brk, overnight, leave,
     diff: netStd === null ? null : worked - netStd,
   };
 }
@@ -245,6 +255,9 @@ function renderToday() {
   const rec = data.records[k] || {};
   renderMark($('markIn'), rec, 'in');
   renderMark($('markOut'), rec, 'out');
+  const curLeave = [120, 240, 480].includes(rec.leave) ? rec.leave : 0;
+  document.querySelectorAll('.quick-row .leave-btn').forEach(b =>
+    b.classList.toggle('active', Number(b.dataset.leave) === curLeave));
   updateTodayStatus();
 }
 
@@ -292,8 +305,10 @@ function updateTodayStatus() {
   } else {
     const night = st.overnight ? ' (익일 퇴근)' : '';
     const brk = st.brk > 0 ? ` (휴식 ${fmtHM(st.brk)} 제외)` : '';
+    const lv = st.leave ? ` · 연차 ${st.leave / 60}h 포함` : '';
     const diff = st.diff === null ? '' : ` · 기준 대비 ${fmtSigned(st.diff)}`;
-    text = `오늘 근무 ${fmtHM(st.worked)}${brk}${night}${diff}`;
+    const head = (!rec.in && !rec.out && st.leave) ? `오늘 연차 ${st.leave / 60}시간` : `오늘 근무 ${fmtHM(st.worked)}`;
+    text = `${head}${brk}${night}${lv}${diff}`;
     cls = st.diff !== null && st.diff < 0 ? 'minus' : 'plus';
   }
   if (el.textContent !== text) el.textContent = text;
@@ -340,9 +355,11 @@ function renderCalendar() {
       html += '<span class="times">'
         + (rec.in ? `<em class="t-in"><i>출 </i>${shortHM(rec.in)}</em>` : '')
         + (rec.out ? `<em class="t-out"><i>퇴 </i>${shortHM(rec.out)}${nd}</em>` : '')
+        + (rec.leave ? `<em class="t-leave">연차 ${rec.leave / 60}h</em>` : '')
         + '</span>';
       if (rec.in) aria += `, 출근 ${rec.in}`;
       if (rec.out) aria += `, 퇴근 ${rec.out}` + (st.kind === 'done' && st.overnight ? ' 익일' : '');
+      if (rec.leave) aria += `, 연차 ${rec.leave / 60}시간`;
       if (st.kind === 'done' && st.diff !== null) {
         const sign = st.diff === 0 ? 'zero' : st.diff > 0 ? 'plus' : 'minus';
         html += `<span class="diff ${sign}">${fmtSigned(st.diff)}</span>`;
@@ -445,6 +462,35 @@ function stamp(type) {
   }
 }
 
+// 정시 적용: 설정한 기준 출퇴근 시각을 그날 기록으로 채움
+function applyStandard(k) {
+  const a = data.settings.workStart, b = data.settings.workEnd;
+  if (toMin(a) === null || toMin(b) === null || toMin(a) === toMin(b)) {
+    toast('기준 근무시간을 먼저 설정하세요', true); return;
+  }
+  const doIt = () => {
+    const rec = Object.assign({}, data.records[k]);
+    rec.in = a; rec.out = b;
+    data.records[k] = rec;
+    persist(); render(); slam('in'); slam('out');
+    toast(`정시 적용 · 출근 ${a} / 퇴근 ${b}`);
+  };
+  const ex = data.records[k] || {};
+  if (ex.in || ex.out) confirmBox(`기존 기록을 기준 시각(${a}~${b})으로 덮어쓸까요?`, doIt, '덮어쓰기');
+  else doIt();
+}
+
+// 오늘 연차 시간 적용/해제 (0이면 해제)
+function setLeaveToday(min) {
+  const k = keyOf(new Date());
+  const rec = Object.assign({}, data.records[k]);
+  if (min > 0) rec.leave = min; else delete rec.leave;
+  if (rec.in || rec.out || rec.leave) data.records[k] = rec;
+  else delete data.records[k];
+  persist(); render();
+  toast(min > 0 ? `연차 ${min / 60}시간 적용` : '연차 해제');
+}
+
 function slam(type) {
   const el = type === 'in' ? $('markIn') : $('markOut');
   el.classList.remove('slam');
@@ -462,6 +508,9 @@ function openEdit(k) {
   const rec = data.records[k] || {};
   $('editIn').value = rec.in || '';
   $('editOut').value = rec.out || '';
+  const curLeave = [120, 240, 480].includes(rec.leave) ? rec.leave : 0;
+  document.querySelectorAll('.edit-leave .leave-btn').forEach(b =>
+    b.classList.toggle('active', Number(b.dataset.leave) === curLeave));
   $('editDelete').hidden = !data.records[k];
   $('editHint').textContent = '';
   delete $('editHint').dataset.warned;
@@ -484,6 +533,9 @@ function saveEdit() {
   const rec = {};
   if (inV !== null) rec.in = inV;
   if (outV !== null) rec.out = outV;
+  const activeLeave = document.querySelector('.edit-leave .leave-btn.active');
+  const leaveMin = activeLeave ? Number(activeLeave.dataset.leave) : 0;
+  if (leaveMin > 0) rec.leave = leaveMin;
 
   if (rec.in && rec.out && toMin(rec.out) === toMin(rec.in)) {
     $('editHint').textContent = '출근과 퇴근이 같은 시각입니다 — 한 번 더 누르면 이대로 저장됩니다 (± 계산 제외).';
@@ -495,7 +547,7 @@ function saveEdit() {
 
   const overnight = rec.in && rec.out && toMin(rec.out) < toMin(rec.in);
   const k = editKey;
-  if (rec.in || rec.out) data.records[k] = rec;
+  if (rec.in || rec.out || rec.leave) data.records[k] = rec;
   else delete data.records[k];
 
   closeModal($('editModal'));
@@ -595,6 +647,21 @@ function toast(msg, isError) {
 function bindEvents() {
   $('btnIn').addEventListener('click', () => stamp('in'));
   $('btnOut').addEventListener('click', () => stamp('out'));
+
+  // 오늘: 정시 적용 · 연차 버튼
+  $('btnStd').addEventListener('click', () => applyStandard(keyOf(new Date())));
+  document.querySelectorAll('.quick-row .leave-btn').forEach(btn =>
+    btn.addEventListener('click', () => setLeaveToday(Number(btn.dataset.leave))));
+
+  // 수정 모달: 정시 적용 · 연차 선택(저장 시 반영)
+  $('editStd').addEventListener('click', () => {
+    $('editIn').value = data.settings.workStart;
+    $('editOut').value = data.settings.workEnd;
+  });
+  document.querySelectorAll('.edit-leave .leave-btn').forEach(btn =>
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.edit-leave .leave-btn').forEach(b => b.classList.toggle('active', b === btn));
+    }));
 
   $('prevM').addEventListener('click', () => moveMonth(-1));
   $('nextM').addEventListener('click', () => moveMonth(1));
