@@ -380,9 +380,15 @@ main {
 .seg .leave-btn:first-child { border-left: 0; }
 .seg .leave-btn:hover { background: rgba(169, 116, 28, 0.09); color: var(--warn); }
 .seg .leave-btn.active { background: var(--warn); color: #fdf6ea; font-weight: 700; }
-/* 수정 모달: 정시 적용 버튼 + 연차 세그먼트 폭 채움 */
-.btn.small { display: block; width: 100%; font-size: 12.5px; padding: 8px 10px; margin: 4px 0 10px; }
-.leave-ctl.edit-leave { justify-content: flex-start; margin: 2px 0 4px; }
+/* 수정 모달: 퇴근 아래 구분선 + 정시 적용 · 연차 */
+.edit-quick {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.btn.small { display: block; width: 100%; font-size: 12.5px; padding: 8px 10px; margin: 0; }
+.leave-ctl.edit-leave { justify-content: flex-start; margin: 0; }
 .leave-ctl.edit-leave .seg { flex: 1; }
 .leave-ctl.edit-leave .seg .leave-btn { flex: 1; text-align: center; padding: 8px 4px; }
 /* 달력 연차 칩 */
