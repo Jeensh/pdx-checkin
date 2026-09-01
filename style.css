@@ -335,10 +335,10 @@ main {
 }
 .mark-slot.slam { animation: slam 0.42s cubic-bezier(0.2, 0.8, 0.3, 1); }
 
-/* 정시 적용 + 연차 빠른 적용 (오늘 카드) */
+/* 정시 적용 + 연차 빠른 적용 (오늘 카드) — 오른쪽 끝 정렬, 세로 스택 */
 .quick-row {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 12px;
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 10px;
   margin: 16px 0 4px;
   padding-top: 14px;
   border-top: 1px solid var(--line-soft);
