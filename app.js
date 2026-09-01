@@ -346,7 +346,8 @@ function renderCalendar() {
     cell.className = 'cal-cell'
       + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '')
       + (k === todayK ? ' today' : '')
-      + (rec ? ' has-rec' : '');
+      + (rec ? ' has-rec' : '')
+      + (rec && rec.leave ? ' has-leave' : '');
 
     let aria = `${viewY}년 ${viewM + 1}월 ${d}일 ${DOW[dow]}요일`;
     let html = `<span class="dnum">${d}</span>`;

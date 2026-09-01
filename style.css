@@ -335,10 +335,13 @@ main {
 }
 .mark-slot.slam { animation: slam 0.42s cubic-bezier(0.2, 0.8, 0.3, 1); }
 
-/* 정시 적용 + 연차 빠른 적용 */
+/* 정시 적용 + 연차 빠른 적용 (오늘 카드) */
 .quick-row {
-  display: flex; align-items: center; flex-wrap: wrap;
-  gap: 8px; margin: 12px 0 4px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px;
+  margin: 16px 0 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
 }
 .quick-btn {
   border: 1px solid var(--line);
@@ -346,38 +349,54 @@ main {
   color: var(--ink);
   font-family: var(--sans);
   font-size: 13px; font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 8px;
+  padding: 7px 16px;
+  border-radius: 9px;
   cursor: pointer;
 }
 .quick-btn:hover { background: rgba(51, 46, 36, 0.06); border-color: var(--ink-soft); }
-.leave-group { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.leave-label { font-size: 12px; color: var(--ink-soft); margin-right: 2px; }
-.leave-btn {
+/* 연차 라벨 + 세그먼트 컨트롤 */
+.leave-ctl { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.leave-label { font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
+.seg {
+  display: inline-flex;
   border: 1px solid var(--line);
+  border-radius: 9px;
+  overflow: hidden;
   background: var(--card);
+}
+.seg .leave-btn {
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   color: var(--ink-soft);
   font-family: var(--sans);
   font-size: 12.5px;
-  padding: 5px 9px;
-  border-radius: 7px;
+  padding: 6px 15px;
   cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
 }
-.leave-btn:hover { border-color: var(--warn); color: var(--warn); }
-.leave-btn.active { background: var(--warn); color: #fdf6ea; border-color: var(--warn); font-weight: 700; }
-/* 수정 모달 연차: 라벨 왼쪽 정렬 */
-.leave-group.edit-leave { margin: 6px 0 2px; flex-wrap: wrap; }
-.leave-group.edit-leave .leave-btn { flex: 1; text-align: center; }
-.btn.small { font-size: 12.5px; padding: 6px 10px; margin: 4px 0; }
+.seg .leave-btn:first-child { border-left: 0; }
+.seg .leave-btn:hover { background: rgba(169, 116, 28, 0.09); color: var(--warn); }
+.seg .leave-btn.active { background: var(--warn); color: #fdf6ea; font-weight: 700; }
+/* 수정 모달: 정시 적용 버튼 + 연차 세그먼트 폭 채움 */
+.btn.small { display: block; width: 100%; font-size: 12.5px; padding: 8px 10px; margin: 4px 0 10px; }
+.leave-ctl.edit-leave { justify-content: flex-start; margin: 2px 0 4px; }
+.leave-ctl.edit-leave .seg { flex: 1; }
+.leave-ctl.edit-leave .seg .leave-btn { flex: 1; text-align: center; padding: 8px 4px; }
 /* 달력 연차 칩 */
 .t-leave {
   display: inline-block;
-  background: rgba(169, 116, 28, 0.14);
+  background: rgba(169, 116, 28, 0.16);
   color: var(--warn);
   font-size: 10px; font-weight: 700;
   border-radius: 4px;
-  padding: 0 3px;
+  padding: 0 4px;
 }
+/* 연차 쓴 날: 달력 셀 색 구분 (은은한 앰버) */
+.cal-cell.has-leave { background: rgba(169, 116, 28, 0.07); }
+.cal-cell.has-leave:hover { background: rgba(169, 116, 28, 0.12); }
+.cal-cell.has-leave .dnum { color: var(--warn); }
 
 .today-status { font-size: 14px; color: var(--ink-soft); min-height: 21px; }
 .today-status.plus { color: var(--plus); font-weight: 700; }
