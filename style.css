@@ -335,12 +335,12 @@ main {
 }
 .mark-slot.slam { animation: slam 0.42s cubic-bezier(0.2, 0.8, 0.3, 1); }
 
-/* 정시 적용 + 연차 빠른 적용 (오늘 카드) — 오른쪽 끝 정렬, 세로 스택 */
+/* 정시 적용 + 연차 빠른 적용 (오늘 카드) — 한 줄 배치 */
 .quick-row {
-  display: flex; flex-direction: column; align-items: flex-end;
+  display: flex; flex-direction: row; align-items: center; justify-content: space-between;
   gap: 10px;
-  margin: 16px 0 4px;
-  padding-top: 14px;
+  margin: 12px 0 2px;
+  padding-top: 12px;
   border-top: 1px solid var(--line-soft);
 }
 .quick-btn {
@@ -372,10 +372,11 @@ main {
   color: var(--ink-soft);
   font-family: var(--sans);
   font-size: 12.5px;
-  padding: 6px 15px;
+  padding: 6px 11px;
   cursor: pointer;
   transition: background 0.1s ease, color 0.1s ease;
 }
+.leave-ctl .leave-label { white-space: nowrap; }
 .seg .leave-btn:first-child { border-left: 0; }
 .seg .leave-btn:hover { background: rgba(169, 116, 28, 0.09); color: var(--warn); }
 .seg .leave-btn.active { background: var(--warn); color: #fdf6ea; font-weight: 700; }
@@ -398,7 +399,7 @@ main {
 .cal-cell.has-leave:hover { background: rgba(169, 116, 28, 0.12); }
 .cal-cell.has-leave .dnum { color: var(--warn); }
 
-.today-status { font-size: 14px; color: var(--ink-soft); min-height: 21px; }
+.today-status { font-size: 14px; color: var(--ink-soft); min-height: 21px; text-align: center; margin-top: 4px; }
 .today-status.plus { color: var(--plus); font-weight: 700; }
 .today-status.minus { color: var(--minus); font-weight: 700; }
 .today-status.warn { color: var(--warn); font-weight: 700; }

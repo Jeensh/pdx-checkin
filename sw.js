@@ -2,7 +2,7 @@
 // 전략: 캐시 즉시 표시(빠른 실행) + 백그라운드 갱신(stale-while-revalidate)
 // → 앱이 네트워크를 기다리지 않고 바로 뜨고, 새 버전은 다음 실행에 반영된다.
 
-const CACHE = 'checkin-v16';
+const CACHE = 'checkin-v17';
 const ASSETS = [
   './',
   './index.html',
